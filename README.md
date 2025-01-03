@@ -1,5 +1,5 @@
 # statistical-datamining
-# README: Graduate Coursework in Statistical Learning and Data Analysis
+# README:  Statistical Learning and Data Analysis
 
 ## Overview
 This repository highlights solutions and implementations from my graduate coursework in Statistical Learning and Data Analysis. Each section presents key concepts, methodologies, and results from the projects demonstrating the application of statistical and machine learning techniques in various contexts.
