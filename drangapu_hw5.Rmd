@@ -1,0 +1,244 @@
+---
+title: "drangapu_hw5"
+output: pdf_document
+date: "2024-05-09"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+**1) Elements of Statistical Learning #17.2**
+
+```{r}
+library(igraph)
+cond_idpt <- function(graph,n1,n2,nodes) {
+  subgraph <- delete_vertices(graph,nodes)
+  paths <- all_simple_paths(subgraph,from=n1,to =n2)
+  return(length(paths)== 0)
+}
+edges_a <- matrix(c("X", "Y", "Y", "Z"), ncol=2, byrow=TRUE)
+edges_b <- matrix(c("X", "Y", "Y", "W", "Z", "Z"), ncol=2, byrow=TRUE)
+edges_c <- matrix(c("X", "Y", "Y", "Z", "Z", "W", "X", "W"), ncol=2, byrow=TRUE)
+edges_d <- matrix(c("X", "Y", "Y", "Z", "Z", "W"), ncol=2, byrow=TRUE)
+
+graph_a <- graph_from_edgelist(edges_a, directed = FALSE)
+graph_b <- graph_from_edgelist(edges_b, directed = FALSE)
+graph_c <- graph_from_edgelist(edges_c, directed = FALSE)
+graph_d <- graph_from_edgelist(edges_d, directed = FALSE)
+
+cat("Graph (a): Are X and Z conditionally independent given Y?", cond_idpt(graph_a, "X", "Z", "Y"), "\n")
+cat("Graph (b): Is Z conditionally independent given X,Y,W?  ",cond_idpt(graph_b, "Z", "X", c("Y","W")),"\n")
+cat("Graph (c): Are X and Z conditionally independent given Y? ", 
+    cond_idpt(graph_c, "X", "Z", "Y"), "\n")
+cat("Graph (c): Are X and W conditionally independent given Y and Z? ", 
+    cond_idpt(graph_c, "X", "W", c("Y", "Z")), "\n")
+cat("Graph (d): Are X and W conditionally independent given Y and Z? ", 
+    cond_idpt(graph_d, "X", "W", c("Y", "Z")), "\n")
+```
+
+**Consider the following webgraphs. (a) Compute the PageRank vector of Webgraph A for damping constants p = 0.05, 0.25, 0.50, 0.75, and 0.95. How sensitive is the PageRank vector, and overall ranking of importance, to the damping constant? Does the relative ranking of importance according to PageRank support your intuition? (b) Compute the PageRank vector of Webgraph B for damping constant p = 0.15. Interpret your results in terms of the relationship between the number of incoming links that each node has. Does the relative ranking of importance according to PageRank support your intuition?**
+
+```{r}
+library(igraph)
+edges_A <- c('C', 'A', 'B', 'C', 'D', 'B', 'B', 'E', 'E', 'D', 'D', 'E', 'F', 'C')
+graph_A <- graph(edges_A, directed = TRUE)
+edges_B <- c('B', 'A', 'C', 'A', 'D', 'B', 'E', 'B', 'F', 'C', 'G', 'C', 'H', 'C')
+graph_B <- graph(edges_B, directed = TRUE)
+
+dmp_factors <- c(0.05, 0.25, 0.50, 0.75, 0.95)
+pagernk_A <- lapply(dmp_factors, function(d) {
+    page_rank(graph_A, directed = TRUE, damping = d)$vector
+})
+print("PageRank for Webgraph A with given damping factors:")
+print(pagernk_A)
+
+pagernk_B <- page_rank(graph_B, directed = TRUE, damping = 0.15)$vector
+
+print("PageRank for Webgraph B with damping factor 0.15:")
+print(pagernk_B)
+```
+
+### **Webgraph A:**
+
+-   Node C consistently shows one of the highest PageRank scores as a central node.
+
+-   Node A increased importance with higher damping factors due to more random iterations.
+
+-   Nodes D and E are tightly connected and also shows increase in rank with higher damping factors with close interactions
+
+-   Node B decreases in importance as the damping factor rises with lesser centrality.
+
+-   Node F is the least important because of minimal direct influence.
+
+    The PageRank in Webgraph A is sensitive to the damping factor benefiting nodes in dense connections (D, E) or central nodes (C) as the factor increases.
+
+### **Webgraph B:**
+
+-   Nodes B and C are key connectors directing towards Node A and due to their intermediary roles.
+
+-   Node A is the most crucial because it is collecting the influence passed from B and C.
+
+-   Nodes D, E, F, G, H all are lower and equal ranks, each of them are contributing same to B and C, showing no additional structure.
+
+### **Conclusion:**
+
+The PageRank values align well with network structures, where central nodes (like C in A and A in B) are higher importance. The damping factor's influence is crucial in importance of the roles of nodes based on their connectivity and position within the graph.
+
+**Specify the structure of a Bayesian Network that contains four nodes {W,X,Y,Z} and has satisfies the following set of independencies.**
+
+### **Given Independencies:**
+
+1.  W and X are independent.
+
+2.  W and Z are not independent given X.
+
+3.  Z and W are independent given Y.
+
+4.  W and Y are not independent.
+
+5.  X and Y are not independent.
+
+6.  W and X are not independent given Z.
+
+7.  X and Z are independent given W and Y.
+
+### **Network Structure:**
+
+-   .Y influence's both W and X to maintain their dependence on Y but independence from each other when Y is not conditioned.
+
+-   Z is influenced by Y, and have a conditional dependency with W that can be overridden by conditioning on Y.
+
+-   There is no direct path between X and Z that is either through W or Y and their connection must be mediated.
+
+-   Y → W, Y → X: Directly influences from Y to W and X to establish their dependency on Y.
+
+-   Y → Z: Z's dependency on Y helps in controlling the influence of Z on W when Y is conditioned.
+
+-   Z → W: This creates a pathway where Z can influence W but only when X is not conditioned.
+
+```{r}
+
+library(bnlearn)
+dag <- model2network("[X][W][Y|X:W][Z|Y]")
+plot(dag)
+
+cat("W independent of X:", dsep(dag, "W", "X"), "\n")
+cat("W not independent of Z given X:", !dsep(dag, "W", "Z", c("X")), "\n")
+cat("Z independent of W given Y:", dsep(dag, "Z", "W", "Y"), "\n")
+cat("W not independent of Y:", !dsep(dag, "W", "Y"), "\n")
+cat("X not independent of Y:", !dsep(dag, "X", "Y"), "\n")
+cat("W not independent of X given Z:", !dsep(dag, "W", "X", "Z"), "\n")
+cat("X independent of Z given W, Y:", dsep(dag, "X", "Z", c("W", "Y")), "\n")
+
+```
+
+**Data released from the US department of Commerce, Bureau of the Census is\
+available in R.\
+\>data(state)\
+\>?state\
+Build a Gaussian Graphical Model using the Graphical Lasso for the 8 predictors\
+(Population, Income, Illiteracy, Life Exp, Murder, HS Grad, Frost, Area) using a\
+range of penalties. What do you find for different penalties, and how does it\
+compliment (and/or contradict) a model fit with SOM?**
+
+```{r}
+library(glasso)
+library(kohonen)
+library(corrplot)
+
+data(state)
+states <- data.frame(state.x77)
+predictors <- states[, c("Population", "Income", "Illiteracy", "Life.Exp", "Murder", "HS.Grad", "Frost", "Area")]
+predictors <- na.omit(predictors) 
+predictors <- scale(predictors) 
+
+penalties <- c(0.01, 0.1, 1, 10)
+res <- lapply(penalties, function(pen) glasso(cov(predictors), rho=pen))
+
+lapply(res, function(model) {print(paste("Penalty:", model$rho))
+  corrplot(model$wi,is.corr = FALSE, title= paste("Graphical Lasso penalty =", model$rho))
+})
+non_zr_counts <- lapply(res, function(model) sum(model$wi != 0, na.rm = TRUE))
+print("Non-zero counts in precision matrices for each penalty:")
+print(non_zr_counts)
+
+
+set.seed(43)
+grid <- somgrid(xdim = 5, ydim = 5, topo = "rectangular")
+som_model <- som(predictors, grid = grid, rlen = 120)
+
+
+plot(som_model, type = "codes") 
+plot(som_model, type = "count") 
+plot(som_model, type = "quality")
+plot(som_model, type = "dist.neighbours", main = "U-matrix")
+
+```
+
+#### **GLASSO :**
+
+-   **Lower Penalties ( 0.01 and 0.1):** These models produce precision matrices with more non-zero entries (58 and 44, respectively), indicating a larger number of conditional dependencies between variables. This indicates that at lower penalties, the model considers many variables as interconnected.
+
+-   **Higher Penalties (1 and 10):** With only 8 non-zero entries in the precision matrices, the model shows high sparsity, indicating that most variables are conditionally independent except for a few strong dependencies.
+
+### **SOM**:
+
+-   The SOM displays clusters of variables across different nodes showing how variables group based on similarities in their data patterns across states. This method captures relationships and can highlight similarities by non-linear interactions and complex patterns not detected by the Graphical Lasso.
+
+### **Complementary :**
+
+-   **GLASSO**: The sparse structure in GLASSO particularly at higher penalties identifies the strongest and most direct relationships between variables. For example, if Income strongly related with Life Expectancy in a sparse GLASSO model, it suggests a direct dependency.
+
+-   **SOM**: The SOM on the other hand provides clustering states based on overall similarity across multiple metrics. It shows how states group based on similar characteristics.
+
+### **Contradictory :**
+
+-   **Dependencies:** If variables are close in the SOM but appear independent in high-penalty Graphical Lasso settings this indicate that their proximity in the SOM is driven by external factors that do not constitute a direct dependency.
+
+**Consider the “cad1" data set in the package gRbase. These observations are\
+from individuals in the Danish Heart Clinic.\
+(a) Learn a Bayesian Network using a structural learning knowledge, and prior\
+knowledge obtained through the de nitions of the variables in the help les. You\
+do not have to use all of the variables. Make sure to detail your network\
+construction process.\
+(b) Construct the above network in R, and infer the Conditional Probability Tables\
+using the cad1 data. Identify any d-separations in the graph.\
+(c) Suppose it is known that a new observation is female with\
+Hypercholesterolemia (high cholesterol). Absorb this evidence into the graph and\
+revise the probabilities. How does the probability of heart-failure and coronary\
+artery disease (CAD) change after this information is considered?**
+
+```{r}
+
+library(gRbase)
+library(bnlearn)
+
+data(cad1, package = "gRbase")
+model <- model2network("[Sex][Hyperchol|Sex][CAD|Hyperchol][Heartfail|CAD:Hyperchol]")
+fitted_model<- bn.fit(model, data = cad1[, c("Sex", "Hyperchol", "CAD", "Heartfail")])
+
+print("Fitted Bayesian Network Structure:")
+print(model)
+print("Conditional Probability Tables for each node:")
+print(fitted_model$Sex)
+print(fitted_model$Hyperchol)
+print(fitted_model$CAD)
+print(fitted_model$Heartfail)
+print("D-separation between 'Heartfail' and 'Sex' given 'CAD' and 'Hyperchol':")
+print(dsep(fitted_model, "Heartfail", "Sex", c("CAD", "Hyperchol")))
+data <- rbn(fitted_model, n = 10000)
+
+data_with_evidence <- subset(data, Sex == "Female" & Hyperchol == "Yes")
+pb_cad_yes <- mean(data_with_evidence$CAD == "Yes")
+pb_heartfail_yes <- mean(data_with_evidence$Heartfail == "Yes")
+
+print(paste(" P(CAD='Yes' | Sex='Female', Hyperchol='Yes'):", pb_cad_yes))
+print(paste("Simulated P(Heartfail='Yes' | Sex='Female', Hyperchol='Yes'):", pb_heartfail_yes))
+
+
+```
+
+Based on the above Bayesian Network and its Conditional Probability Tables reveal that the probability of Coronary Artery Disease (CAD) for a female with Hypercholesterolemia is approximately 64.29%, indicating a strong link between Hypercholesterolemia and CAD. Heart Failure's probability under the same conditions is around 18.81%, showing a medium but significant risk increase due to CAD influenced by Hypercholesterolemia.
+
+This analysis highlights the chain effect of risk factors where Hypercholesterolemia increases the risk of CAD, which increases the likelihood of Heart Failure. The d-separation confirms that the sex of the individual is not useful and not beneficial about Heart Failure risk when CAD and Hypercholesterolemia statuses are known.

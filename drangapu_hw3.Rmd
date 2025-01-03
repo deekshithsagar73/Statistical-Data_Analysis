@@ -1,0 +1,590 @@
+---
+title: "SDM2"
+author: "Drangapu"
+date: "2024-04-02"
+output:
+  pdf_document: default
+  html_document: default
+  word_document: default
+editor_options:
+  markdown:
+    wrap: 72
+---
+
+1)  **The “chorSub” data from the “cluster” package contains
+    measurements of 10 chemicals in 61 geological samples from the Kola
+    Peninsula. Cluster the data using k-means and hierarchical
+    clustering. What is a good choice of “k” for each of these methods?
+    Justify your selection**
+
+```{r}
+if (!require(cluster)) {
+  install.packages("cluster")
+}
+library(cluster)
+data("chorSub")
+dats<-chorSub[]
+```
+
+**Exploratory Data Analysis (EDA)**
+
+```{r}
+str(dats)
+summary(dats)
+```
+
+```{r}
+head(dats)
+dim(dats)
+```
+
+**Clustering the data using kmeans and hierarchical clustering**
+
+**k-means Clustering**
+
+```{r}
+k <- 5
+set.seed(123)
+km<-kmeans(chorSub,centers=k,nstart=10)
+print(km)
+```
+
+```{r}
+km$cluster
+```
+
+```{r}
+km$centers
+```
+
+```{r}
+pca_scl <- prcomp(scale(dats), center = TRUE)
+pca_data <- data.frame(pca_scl$x[,1:2])
+pca_centers <- predict(pca_scl, newdata = km$centers)
+pca_data$cluster <- as.factor(km$cluster)
+pca_centers <- as.data.frame(pca_centers)
+pca_centers$cluster <- as.factor(1:nrow(pca_centers))
+```
+
+```{r}
+library(ggplot2)
+ggplot(pca_data, aes(x = PC1, y = PC2, color = cluster)) +
+  geom_point(alpha = 0.5) +geom_point(data = pca_centers, aes(x = PC1, y = PC2, color = cluster),size = 12, shape = 8) +  
+  theme_minimal() +
+  labs(title = "K-means Clustering with PCA",x = "Principal Component 1",
+       y = "Principal Component 2") + scale_color_discrete(name = "Cluster")
+```
+
+**Hierarchical Clustering**
+
+```{r}
+library(cluster)
+library(factoextra)
+data_scl<- scale(chorSub)
+set.seed(123)
+opt_clusters <- 5 
+km <- kmeans(data_scl, centers = opt_clusters, nstart = 25)
+d <- dist(data_scl)
+hc <- hclust(d, method = "ward.D")
+```
+
+```{r}
+plot(hc)
+rect.hclust(hc, k = opt_clusters)
+grps <- cutree(hc, k = opt_clusters)
+data_clstd <- data.frame(chorSub, KMeans_Cluster = km$cluster, Hierarchical_Cluster = grps)
+k_plot<-fviz_cluster(list(data = data_scl, cluster = km$cluster))
+print(k_plot)
+pca_res <- prcomp(data_scl)
+fviz_cluster(list(data = pca_res$x, cluster = grps))
+
+
+```
+
+**What is a good choice of “k” for each of these methods? Justify your
+selection.**
+
+For K-means clustering k can be choosen by analysing the data using
+elbow method, silhouette method and gap statistic method. here we will
+use Elbow method and Silhouette analysis.
+
+**Elbow method**
+
+```{r}
+wss <- sapply(1:15, function(k){sum(kmeans(data_scl, k, nstart = 10)$withinss)})
+plot(1:15, wss, type = "b", xlab = "No. of clusters", ylab = "Total Sum Of Squares(Cluster)")
+```
+
+This graph gradually smooths out as the number of clusters increases,
+but there’s a slight bend at k=4. This suggests that adding more
+clusters after four will provide only marginal improvements to the
+model’s fit.
+
+**Silhouette analysis**
+
+```{r}
+sil_scores <- sapply(2:15, function(k){
+  km.res <- kmeans(data_scl, centers = k, nstart = 25)
+  sil_score <- mean(silhouette(km.res$cluster, dist(data_scl))[, 3])
+  return(sil_score)
+})
+plot(2:15, sil_scores, type = "b", xlab = "No. of clusters", ylab = "Avg silhouette width")
+
+```
+
+In Silhoutte analysis, the first peak is at k=4, indicating a strong
+level with two clusters that well-separate the data.
+
+The elbow approach and the silhouette analysis both recommend that k=4
+be used for k-means clustering. This choice is accurate. A massive peak
+can be seen in the silhouette plot at k=4, suggesting a robust structure
+with distinct clusters that are apart from one another. This is
+supported by the elbow plot, which exhibits a small bend at the same
+location and suggests that adding clusters beyond 4 will not
+significantly reduce variation. This methodological consistency confirms
+the correctness for k=4, which means a balanced and understandable
+clustering solution for the chorSub dataset that is both statistically
+and practically significant.For Hierarchical clustering we choose k by
+using dendrogram and silhouette method
+
+**dendrogram**
+
+```{r}
+
+par(mar=c(5,2,4,0) + 0.1)
+plot(hc, cex=0.6)
+rect.hclust(hc, k = opt_clusters)
+```
+
+I searched for notable difference in the linkage distance, which
+frequently specify a natural cluster separation, when analyzing the
+dendrogram above. I analysed the dissimilarity between the data points
+that are clustered together based on the height of the merges. There are
+multiple levels at which clusters merge in this dendrogram, but when I
+pay close attention to the areas where there is a significant rise in
+merge height because these may be possible cuts for significant
+clusters.Five is the potential K value.
+
+**Silhouette analysis**
+
+```{r}
+sil_scores_hc <- sapply(2:15, function(k){
+  clust <- cutree(hc, k)
+  sil_score <- mean(silhouette(clust, dist(data_scl))[, 3])
+  return(sil_score)
+})
+plot(2:15, sil_scores_hc, type = "b", xlab = "No. of clusters", ylab = "Avg silhouette width")
+```
+
+This plot presents a peak at k=3, which is another viable option but not
+as distinct as k=5
+
+Although the silhouette analysis for hierarchical clustering indicates
+that k = 3 would be a good option, the dendrogram offers an alternative
+viewpoint, suggesting that k = 5 might offer more precise clustering.
+Due to significant jumps in the connection distance at this level, which
+indicate a more meaningful division of the data into natural groups , we
+selected k = 5 after analyzing the dendrogram.
+
+2)  **Consider the “diamonds” data from ggplot2. Use principal
+    components on the variables {caret, x, y, z, depth, table}, and
+    answer the following questions.**
+
+<!-- -->
+
+a)  **How much of the total variance does the first principal component
+    account for? How many components are needed to account for at least
+    90% of the total variance?**
+
+```{r}
+library(ggplot2)
+library(FactoMineR)
+```
+
+```{r}
+data(diamonds)
+diamonds_data <- diamonds[, c("carat", "x", "y", "z", "depth", "table")]
+```
+
+```{r}
+pca_result <- PCA(diamonds_data, scale.unit = TRUE, ncp = 6)
+```
+
+```{r}
+exp_var <- pca_result$eig
+print(exp_var[,2]) 
+cum_var <- cumsum(exp_var[,2])
+print(cum_var)
+
+```
+
+The first principal component accounts for about 65.54% of the total
+variance. To achieve at least 90% of the total variance explained, the
+first three components are necessary, cumulatively which is
+ approximately 98.33%. This highlights the importance of these
+components in representing the dataset's variability.
+
+b)  **Judging by the loadings, what do the first two principal
+    components measure?**
+
+```{r}
+a <- pca_result$var$coord
+print(a[, 1:2]) 
+```
+
+The first primary component, which has large loadings on carat, x, y,
+and z, indicates the overall size of the diamonds. The second principal
+component evaluates features of cut quality and proportions orthogonal
+to size. It highlights variations in the form and cut of the diamonds by
+differing loadings on depth and table.
+
+c)  **What is the correlation between the first principal component and
+    price?**
+
+```{r}
+comp1_scores <- pca_result$ind$coord[,1]
+corr_price <- cor(comp1_scores, diamonds$price)
+print(corr_price)
+```
+
+The correlation between the first principal component and the price of
+the diamonds is 0.8920056, indicating a very strong positive
+relationship. This indicate that the principal component, which
+primarily measures the overall size of the diamonds, is a significant
+predictor of their price. The closer this value is to 1, the stronger
+the linear relationship. The size-related measures increase, so does the
+price, in a strong linear way.
+
+d)  **Can the first two principal components be used to distinguish
+    between diamonds with different cuts?**
+
+```{r}
+diamonds$PC1 <- pca_result$ind$coord[,1]
+diamonds$PC2 <- pca_result$ind$coord[,2]
+```
+
+```{r}
+library(ggplot2)
+ggplot(diamonds, aes(x = PC1, y = PC2, color = cut)) +
+  geom_point(alpha = 0.5) +theme_minimal() +
+  labs(title = "PCA of Diamonds by Cut", x = "Principal Component 1", y = "Principal Component 2")
+
+```
+
+The first two primary component’s scatter plot, colored by diamond cut,
+shows how the various cut qualities overlap. There is some clustering,
+with 'Ideal' cuts appearing to be more central and denser, but no group
+is totally isolated from the others. This suggests that although there
+can be patterns linking specific cuts to areas inside the PCA space, the
+initial two principal components do not effectively distinguish diamonds
+based just on their cut quality.
+
+3)  **Consider the Iris data data(iris)**
+
+<!-- -->
+
+a)  **Create a plot using the first two principal components, and color
+    the iris species by class**
+
+```{r}
+data(iris)
+library(ggplot2)
+```
+
+```{r}
+iris.pca <- prcomp(iris[,1:4], center = TRUE, scale. = TRUE)
+iris_pca_data <- data.frame(iris.pca$x, Species = iris$Species)
+```
+
+```{r}
+ggplot(iris_pca_data, aes(x = PC1, y = PC2, color = Species)) +
+  geom_point() + labs(title = "PCA of Iris")
+
+```
+
+b)  **Perform k-means clustering on the first two principal components
+    of the iris data. Plot the clusters different colors, and the
+    specify different symbols to depict the species labels.**
+
+```{r}
+set.seed(123)
+kmeans_result <- kmeans(iris.pca$x[,1:2], centers = 3)
+```
+
+```{r}
+iris_pca_data$Cluster <- as.factor(kmeans_result$cluster)
+```
+
+```{r}
+ggplot(iris_pca_data, aes(x = PC1, y = PC2, color = Cluster, shape = Species)) +geom_point() +labs(title = "K-means Clustering on PCA of Iris")
+
+```
+
+c)  **Use rand index and adjusted rand index to assess how well the
+    cluster assignments capture the species labels.**
+
+```{r}
+library(mclust)
+library(cluster)
+library(clValid)
+library(flexclust)
+
+library(fpc)
+library(fossil)
+library(bootcluster)
+# install.packages("clValid")
+library(clValid)
+
+species_num <- as.numeric(iris$Species)
+randind <- rand.index(species_num, kmeans_result$cluster)
+print(paste("Rand Index:",randind))
+adjind <- adj.rand.index(species_num, kmeans_result$cluster)
+print(paste("Adjusted Rand Index:",adjind))
+
+```
+
+The Rand Index of 0.8322 indicates a high similarity between k-means
+clusters and the true iris species labels, while the Adjusted Rand Index
+of 0.6201, suggests a strong agreement. These values demonstrate that
+the clustering captures the natural groupings of the Iris dataset.
+
+d)  **Use the gap statistic and silhouette plots to determine the number
+    of clusters**
+
+```{r}
+library(cluster)
+library(factoextra)
+```
+
+```{r}
+set.seed(123)
+gap_stat <- clusGap(iris.pca$x[,1:2], FUN = kmeans, nstart = 25, K.max = 10)
+```
+
+```{r}
+opt_clusters <- maxSE(gap_stat$Tab[, "gap"], gap_stat$Tab[, "SE.sim"], method = "Tibs2001SEmax")
+print(opt_clusters)
+```
+
+The output indicates that the optimal number of clusters for your
+dataset, based on the gap statistic and its standard error is 3. This
+result aligns well with the structure of the Iris dataset, which
+contains three distinct species.
+
+e)  **Reflect on the results, especially c-d. What does this tell us
+    about the clustering?**
+
+The results of the Rand Index and Adjusted Rand Index show that k-means
+clustering and the genuine Iris species labels match well. the Adjusted
+Rand Index accounts for chance to give a more accurate assessment. The
+best number of clusters, as determined by the gap statistics is
+three,which matches with the actual number of species. This indicates
+that PCA and k-means were accurate in revealing the underlying structure
+of the Iris dataset. These results validate the strategy for exploratory
+analysis and pattern recognition by highlighting the ability of
+unsupervised learning approaches to identify occurring groupings within
+data.
+
+**Consider the wine quality data
+(<https://archive.ics.uci.edu/dataset/186/wine+quality>)**
+
+<!-- -->
+
+```{r}
+library(dplyr)
+library(tidyverse)
+red_wine <- read.csv("C:/msinub/sdm/winequality-red.csv", sep = ";")
+white_wine <- read.csv("C:/msinub/sdm/winequality-white.csv", sep = ";")
+
+red_wine$wine_color <- 'red'
+white_wine$wine_color <- 'white'
+
+wine_data <- bind_rows(red_wine, white_wine)
+
+str(wine_data)
+```
+
+a)  **Perform exploratory data analysis on the data. Summarize the data
+    quality and characterisHcs. Discuss any apparent outliers and
+    associaHons.**
+
+**EDA - Exploratory Data Analysis**
+
+```{r}
+summary(wine_data)
+```
+
+```{r}
+sum(is.na(wine_data))
+```
+
+```{r}
+sum(duplicated(wine_data)) 
+```
+
+```{r}
+wine_data <- wine_data[!duplicated(wine_data), ]
+
+```
+
+```{r}
+boxplot(wine_data[,sapply(wine_data, is.numeric)])
+
+```
+
+The boxplot for the wine quality dataset reveals numerous outliers,
+particularly in total.sulfur.dioxide, which could affect the clustering
+outcomes. Distributions vary across variables, indicating the need for
+data normalization.The dataset contains duplicates that should be
+addressed to ensure the integrity of Dataset.
+
+b)  **Perform k-means using Principal Components of the wine data.
+    Justify your choice of “k”. Visualize the result using a biplot and
+    color the points (samples) according to “wine color”.**
+
+```{r}
+
+library(ggplot2)
+library(factoextra)
+
+wine_data_num <- wine_data[sapply(wine_data, is.numeric)]
+wine_data_scl <- scale(wine_data_num)
+
+```
+
+```{r}
+pca_res <- prcomp(wine_data_scl, center = TRUE, scale. = TRUE)
+
+
+k_plot<- fviz_nbclust(pca_res$x, kmeans, method = "wss") + geom_vline(xintercept = 3, linetype = 2)
+print(k_plot)
+set.seed(123)  
+k <- 3
+km_res <- kmeans(pca_res$x[, 1:2], centers = k)
+wine_data$Cluster <- as.factor(km_res$cluster)
+
+
+```
+
+The elbow plot indicates an optimal k-value of 3 for clustering by the
+point where the within-cluster sum of squares begins to decline more
+slowly, marking the elbow. Choosing k = 3 will balance between
+minimizing within-cluster variance and avoiding overfitting with too
+many clusters. This number represents a meaningful separation in the
+wine dataset, capturing significant variance between the clusters while
+keeping the model simple.
+
+**performing k-means clustering with k set to 3 and create the biplot
+with clusters and the wine color:**
+
+```{r}
+library(ggfortify)
+set.seed(123) 
+km_res <- kmeans(pca_res$x[, 1:2], centers = 3)
+pca_cluster <- data.frame(pca_res$x, Cluster = factor(km_res$cluster))
+pca_cluster$wine_color <- wine_data$wine_color
+library(ggfortify)
+autoplot(prcomp(wine_data_scl), data = pca_cluster, colour = 'wine_color', shape = 'Cluster')
+
+```
+
+About 47% of the variance is explained by the first two principal
+components, indicating that while they capture significant aspects of
+wine, they do not be considered for all of it. Wines are not strictly
+separated by color in k-means-formed clusters, suggesting that there are
+more complex elements to consider  than just hue. This plot helps
+explain how wines are grouped according to their characteristics and may
+suggest more slight differences than color classification can convey.
+Clearer separations might result from additional research using more
+components or by using different clustering techniques.
+
+c)  **Fit an SOM and color the samples according to wine color. Cluster
+    the codebook vectors of the prototypes using hclust**.
+
+```{r}
+
+if (!requireNamespace("kohonen", quietly = TRUE)) {
+  install.packages("kohonen")
+}
+library(kohonen)
+wine_data_num <- wine_data[, sapply(wine_data, is.numeric)]
+wine_data_scl <- scale(wine_data_num)
+som_x <- 5 
+som_y <- 5  
+
+som_grid <- somgrid(xdim = som_x, ydim = som_y, topo = "rectangular")
+som_model <- som(wine_data_scl, grid = som_grid)
+
+plot(som_model, type = "mapping", col = as.factor(wine_data$wine_color))
+
+dist_matrix <- dist(som_model$codes[[1]])
+hclust_res <- hclust(dist_matrix)
+
+plot(hclust_res)
+
+h_clusters <- 3  
+clusters <- cutree(hclust_res, h_clusters)
+
+som_model$colors <- as.factor(clusters)
+plot(som_model, type = "mapping", col = som_model$colors)
+
+```
+
+d)  **Construct phase-plots (aka component planes) for some of the
+    variables in the dataset.**
+
+```{r}
+library(kohonen)
+
+par(mfrow = c(2, 3))
+for (i in 1:12) {
+ 
+  comp_plane <- wine_data_scl[, i]
+  
+  var_name <- colnames(wine_data_scl)[i]
+  
+  plot(som_model, type = "property", property = comp_plane, main = var_name)
+}
+
+```
+
+e)  **Comment on the differences between b and c.**
+
+The k-means clustering applied to the principal components of the wine
+data (b) indicated clusters that, while not strictly separating wines by
+color, did show some variation based on the most significant variances
+captured by PCA. As seen in the biplot, the k-means method offered a
+straightforward, linear segmentation of the data that is very helpful
+for locating large differences in the dataset.
+
+The mapping of the wine data, however, was more complex and thorough in
+the SOM analysis (c). The SOM grid, which uses color coding based on
+wine color, revealed that it is more difficult to distinguish between
+red and white wines, pointing to a more intricate interaction between
+the many wine characteristics. Additional levels of structure were
+produced by the hierarchical clustering that was then applied to the SOM
+codebook vectors seen in the dendrogram. This highlighted a hierarchical
+organization within the data that is not revealed by k-means
+clustering.\
+\
+Part-d component planes provide additional information about the
+contributions of the individual variables throughout the grid, enhancing
+our comprehension of how each chemical measurement affects cluster
+formation.
+
+The principal difference between the two methods is how they deal with
+data complexity. By distinct, non-overlapping clusters, the k-means
+method aims to reduce complexity and is perfect for spotting broad
+trends. SOMs have complexity, permitting smooth transitions between
+various wine properties and overlapping clusters, which may better
+capture the insights of the real world found in the data.
+
+The analytical goals should guide the decision between SOM and k-means.
+K-means provides an easily interpreted high-level view that might serve
+as a useful foundation for additional investigation. SOMs, on the other
+hand, work well in exploratory analysis, where catching the complex
+patterns in the data is more crucial than achieving instant clarity. If
+the objective of the wine quality dataset is to establish distinct
+market segments, then k-means might be a better fit. SOM would offer a
+deeper and more thorough viewpoint if the objective is to investigate
+the minute details of wine composition.
