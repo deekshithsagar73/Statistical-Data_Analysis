@@ -79,4 +79,11 @@ This repository highlights solutions and implementations from my graduate course
 - Check visualizations and statistical evaluations included in the reports for insights into the results.
 
 This repository serves as a portfolio of my coursework, showcasing my understanding and application of key topics in statistical learning and data analysis.
+## License and Usage Policy
 
+This repository is for **educational purposes only**. 
+
+- Redistribution, modification, or use of this code in any form without explicit permission from the author is strictly prohibited.
+- The contents are copyrighted and protected under intellectual property laws.
+
+If you have questions or need permission to use the code, please contact 
